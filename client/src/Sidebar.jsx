@@ -29,7 +29,8 @@ import {
   FaMapMarkedAlt, // ➕ Added for Itinerary Tour
   FaCar, // ➕ Added for F1 Racing
   FaMotorcycle, // ➕ Added for MotoGP Racing
-  FaPlaneArrival // ➕ Added for Departure City
+  FaPlaneArrival, // ➕ Added for Departure City
+  //FaPlaneArrival, // ➕ Added for Departure City1
 } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -58,6 +59,7 @@ const Sidebar = () => {
     { icon: FaCar, label: 'F1 Racing', path: '/f1-racing' },
     { icon: FaMotorcycle, label: 'MotoGP Racing', path: '/motogp-racing' },
     { icon: FaPlaneArrival, label: 'Departure Cities', path: '/departure-cities' },
+     { icon: FaPlaneArrival, label: 'Departure Cities', path: '/departure-cities-1' },
     { icon: FaBook, label: 'Itinerary', path: '/itinerary' },
     { icon: FaPhone, label: 'Contact', path: '/contact' }
   ];

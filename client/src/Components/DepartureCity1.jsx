@@ -1,14 +1,15 @@
 //===================================
-// Group Tours & Departure Cities Manager
+// Curated Journeys & Departure Cities Manager
 
-//================++++++++++++++++++===========================
+//================++++++++++++++++++=======
+
 
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { ChevronDown, ChevronUp, Plus, Trash2, Edit, Eye, RefreshCw, Save } from "lucide-react";
 
 // API Endpoints
-const API_BASE = "http://localhost:5858/api/departure-cities";
+const API_BASE = "http://localhost:5858/api/departurecities1";
 const ITENARY_TOUR_API = "http://globe.ridealmobility.com/api/itenary-tour";
 
 // Helper Functions
@@ -587,7 +588,7 @@ const DepartureCityManager = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Group Tours & Departure Cities Manager</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Curated Journeys & Departure Cities Manager</h1>
           <p className="mt-2 text-sm text-gray-600">
             Manage tour departure cities with complete package details
           </p>

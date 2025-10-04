@@ -24,6 +24,7 @@ import FootballTournament from './Components/Tournament/FootballTournament'
 import F1Racing from './Components/Tournament/F1Racing'
 import MotoGPRacing from './Components/Tournament/MotoGpRacing'
 import DepartureCity from './Components/DepartureCity'
+import DepartureCity1 from './Components/DepartureCity1' 
 
 // Placeholder components for each route
 const Dashboard = () => <div className="content-card"><h1 className="page-title">Dashboard</h1><p>Welcome to the Travel Portal Dashboard</p></div>
@@ -56,6 +57,7 @@ function App() {
           <Route path="f1-racing" element={<F1Racing />} />
           <Route path="motogp-racing" element={<MotoGPRacing />} />
           <Route path="departure-cities" element={<DepartureCity />} />
+          <Route path="departure-cities-1" element={<DepartureCity1 />} />
           <Route path="itinerary" element={<Itenary />} />
           <Route path="particular-itenary-tour/:itenaryTourId/:cardId" element={<ParticularItenaryTour />} />
           <Route path="contact" element={<Contact />} />

@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-const API_BASE = "http://globe.ridealmobility.com/api/sport/football-tournament";
+const API_BASE = "http://localhost:5858/api/sport/football-tournament";
 
 const initialTournament = {
-  cardId: "",
   name: "",
   hostCountries: [],
   startDate: "",
@@ -16,25 +15,17 @@ const initialTournament = {
 };
 
 const initialMatch = {
-  matchName: "",
-  date: "",
-  teams: [
-    { name: "", flag: null, score: 0 },
-    { name: "", flag: null, score: 0 }
-  ],
-  venue: "",
+  matchNumber: 1,
   stage: "",
   group: "",
-  homeTeam: "",
-  awayTeam: "",
-  status: "Scheduled"
-};
-
-const initialStage = {
-  name: "",
-  startDate: "",
-  endDate: "",
-  description: ""
+  date: "",
+  time: "",
+  venue: "",
+  teams: [
+    { name: "", code: "", flag: null, score: null },
+    { name: "", code: "", flag: null, score: null }
+  ],
+  status: "Fixture"
 };
 
 const initialGroup = {
@@ -51,16 +42,13 @@ export default function FootballTournament() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [matchForm, setMatchForm] = useState(initialMatch);
-  const [teamFlags, setTeamFlags] = useState([null, null]); // For storing team flag files
-  const [teamFlagPreviews, setTeamFlagPreviews] = useState([null, null]); // For previewing flag images
+  const [teamFlags, setTeamFlags] = useState([null, null]);
+  const [teamFlagPreviews, setTeamFlagPreviews] = useState([null, null]);
   const [matchEditId, setMatchEditId] = useState(null);
-  const [activeTab, setActiveTab] = useState("basic"); // basic | stages | groups | matches
-  const [cardSections, setCardSections] = useState([]); // For cardId dropdown
+  const [activeTab, setActiveTab] = useState("basic");
 
-  // Fetch tournaments and card sections
   useEffect(() => {
     fetchTournaments();
-    fetchCardSections();
   }, []);
 
   const fetchTournaments = async () => {
@@ -69,34 +57,12 @@ export default function FootballTournament() {
       const res = await axios.get(API_BASE);
       setTournaments(res.data);
     } catch (err) {
-      setError("Failed to fetch tournaments");
+      setError("Failed to fetch tournaments: " + (err.response?.data?.message || err.message));
+      console.error("Fetch tournaments error:", err.response || err);
     }
     setLoading(false);
   };
 
-  // Fetch tournaments by cardId
-  const fetchTournamentsByCardId = async (cardId) => {
-    if (!cardId) return;
-    setLoading(true);
-    try {
-      const res = await axios.get(`${API_BASE}/card/${cardId}`);
-      setTournaments(res.data);
-    } catch (err) {
-      setError("Failed to fetch tournaments for this card");
-    }
-    setLoading(false);
-  };
-
-  const fetchCardSections = async () => {
-    try {
-      const res = await axios.get("http://globe.ridealmobility.com/api/sport/card");
-      setCardSections(res.data);
-    } catch (err) {
-      console.error("Failed to fetch card sections:", err);
-    }
-  };
-
-  // Handle tournament form changes
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === "bannerImage" && files.length > 0) {
@@ -107,102 +73,149 @@ export default function FootballTournament() {
     }
   };
 
-  // Handle array field changes
-  const handleArrayChange = (field, index, value) => {
-    const updatedArray = [...formData[field]];
-    updatedArray[index] = value;
-    setFormData({ ...formData, [field]: updatedArray });
+  const clearBannerImage = () => {
+    setFormData({ ...formData, bannerImage: null });
+    setBannerPreview(null);
   };
 
-  // Add item to array field
   const addArrayItem = (field, item = "") => {
     setFormData({ ...formData, [field]: [...formData[field], item] });
   };
 
-  // Remove item from array field
   const removeArrayItem = (field, index) => {
     const updatedArray = [...formData[field]];
     updatedArray.splice(index, 1);
     setFormData({ ...formData, [field]: updatedArray });
   };
 
-  // Add stage
-  const addStage = () => {
-    setFormData({ ...formData, stages: [...formData.stages, { ...initialStage }] });
-  };
-
-  // Add group
   const addGroup = () => {
     setFormData({ ...formData, groups: [...formData.groups, { ...initialGroup }] });
   };
 
-  // Create or update tournament
+  const handleGroupChange = (groupIndex, field, value) => {
+    const updatedGroups = [...formData.groups];
+    updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], [field]: value };
+    setFormData({ ...formData, groups: updatedGroups });
+  };
+
+  const addTeamToGroup = (groupIndex) => {
+    const updatedGroups = [...formData.groups];
+    const currentTeams = updatedGroups[groupIndex].teams || [];
+    updatedGroups[groupIndex].teams = [...currentTeams, { name: "", code: "", flag: null }];
+    setFormData({ ...formData, groups: updatedGroups });
+  };
+
+  const handleTeamChange = (groupIndex, teamIndex, field, value) => {
+    const updatedGroups = [...formData.groups];
+    const updatedTeams = [...updatedGroups[groupIndex].teams];
+    updatedTeams[teamIndex] = { ...updatedTeams[teamIndex], [field]: value };
+    updatedGroups[groupIndex].teams = updatedTeams;
+    setFormData({ ...formData, groups: updatedGroups });
+  };
+
+  const handleGroupTeamFlag = (groupIndex, teamIndex, file) => {
+    const updatedGroups = [...formData.groups];
+    const updatedTeams = [...updatedGroups[groupIndex].teams];
+    updatedTeams[teamIndex] = { 
+      ...updatedTeams[teamIndex], 
+      flag: file,
+      flagPreview: URL.createObjectURL(file)
+    };
+    updatedGroups[groupIndex].teams = updatedTeams;
+    setFormData({ ...formData, groups: updatedGroups });
+  };
+
+  const removeTeamFromGroup = (groupIndex, teamIndex) => {
+    const updatedGroups = [...formData.groups];
+    const updatedTeams = [...updatedGroups[groupIndex].teams];
+    updatedTeams.splice(teamIndex, 1);
+    updatedGroups[groupIndex].teams = updatedTeams;
+    setFormData({ ...formData, groups: updatedGroups });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.name || !formData.startDate || !formData.endDate) {
+      setError("Please fill in all required fields (Name, Start Date, End Date).");
+      return;
+    }
     setLoading(true);
     try {
       const data = new FormData();
       data.append("name", formData.name);
-      data.append("cardId", formData.cardId);
       data.append("hostCountries", JSON.stringify(formData.hostCountries));
-      data.append("startDate", formData.startDate);
-      data.append("endDate", formData.endDate);
-      
-      // Process groups and team flags
-      if (formData.groups && formData.groups.length > 0) {
-        // Create a deep copy to process without changing state
-        const processedGroups = JSON.parse(JSON.stringify(formData.groups));
-        
-        // Process each group's teams
-        processedGroups.forEach((group, groupIndex) => {
-          if (group.teams && Array.isArray(group.teams)) {
-            group.teams.forEach((team, teamIndex) => {
-              // If team is an object with a flag that's a File object
-              if (typeof team === 'object' && team.flag && typeof team.flag === 'object') {
-                // Add the file to FormData with a unique identifier
-                const flagFieldName = `groupTeamFlags_${groupIndex}_${teamIndex}`;
-                data.append(flagFieldName, team.flag);
-                
-                // Replace the File object with the field name for the backend to process
-                team.flagField = flagFieldName;
-                
-                // Remove the actual file object and preview
-                delete team.flag;
-                if (team.flagPreview) {
-                  delete team.flagPreview;
-                }
-              }
-            });
-          }
-        });
-        
-        data.append('groups', JSON.stringify(processedGroups));
-      } else {
-        data.append("groups", JSON.stringify(formData.groups));
-      }
-      
-      // Process stages
+      data.append("startDate", new Date(formData.startDate).toISOString());
+      data.append("endDate", new Date(formData.endDate).toISOString());
       data.append("stages", JSON.stringify(formData.stages));
-      
-      // Add banner if it exists
-      if (formData.bannerImage) data.append("bannerImage", formData.bannerImage);
 
-      if (formMode === "create") {
-        await axios.post(API_BASE, data);
-      } else if (formMode === "edit" && selectedTournament) {
-        await axios.put(`${API_BASE}/${selectedTournament._id}`, data);
+      const processedGroups = JSON.parse(JSON.stringify(formData.groups));
+      const teamFlagFiles = [];
+
+      processedGroups.forEach((group) => {
+        if (group.teams) {
+          group.teams.forEach((team) => {
+            if (team.flag && team.flag instanceof File) {
+              teamFlagFiles.push(team.flag);
+              delete team.flag;
+              if (team.flagPreview) delete team.flagPreview;
+            }
+          });
+        }
+      });
+
+      data.append("groups", JSON.stringify(processedGroups));
+
+      teamFlagFiles.forEach(file => {
+        data.append("teamFlags", file);
+      });
+
+      const processedMatches = JSON.parse(JSON.stringify(formData.matches));
+      const matchTeamFlagFiles = [];
+
+      processedMatches.forEach((match) => {
+        if (match.teams) {
+          match.teams.forEach((team) => {
+            if (team.flag && team.flag instanceof File) {
+              matchTeamFlagFiles.push(team.flag);
+              delete team.flag;
+              if (team.flagPreview) delete team.flagPreview;
+            }
+          });
+        }
+      });
+
+      data.append("matches", JSON.stringify(processedMatches));
+
+      matchTeamFlagFiles.forEach(file => {
+        data.append("matchTeamFlags", file);
+      });
+
+      if (formData.bannerImage instanceof File) {
+        data.append("bannerImage", formData.bannerImage);
       }
+
+      let res;
+      if (formMode === "create") {
+        res = await axios.post(API_BASE, data, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+      } else if (formMode === "edit" && selectedTournament) {
+        res = await axios.put(`${API_BASE}/${selectedTournament._id}`, data, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+      }
+
       setFormMode("list");
       setFormData(initialTournament);
       setBannerPreview(null);
       fetchTournaments();
     } catch (err) {
-      setError("Failed to save tournament");
+      setError("Failed to save tournament: " + (err.response?.data?.message || err.message));
+      console.error("Submit error:", err.response || err);
     }
     setLoading(false);
   };
 
-  // Delete tournament
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this tournament?")) return;
     setLoading(true);
@@ -210,183 +223,398 @@ export default function FootballTournament() {
       await axios.delete(`${API_BASE}/${id}`);
       fetchTournaments();
     } catch (err) {
-      setError("Failed to delete tournament");
+      setError("Failed to delete tournament: " + (err.response?.data?.message || err.message));
+      console.error("Delete error:", err.response || err);
     }
     setLoading(false);
   };
 
-  // Show details
   const showDetails = async (tournament) => {
     setSelectedTournament(tournament);
     setFormMode("details");
     setFormData({
       ...tournament,
-      cardId: tournament.cardId?._id || tournament.cardId || ""
+      startDate: new Date(tournament.startDate).toISOString().slice(0, 10),
+      endDate: new Date(tournament.endDate).toISOString().slice(0, 10),
     });
-    setBannerPreview(tournament.bannerImage ? `http://globe.ridealmobility.com/${tournament.bannerImage}` : null);
+    setBannerPreview(tournament.bannerImage ? `http://localhost:5858/${tournament.bannerImage}` : null);
   };
 
-  // Edit tournament
   const handleEdit = (tournament) => {
     setSelectedTournament(tournament);
     setFormMode("edit");
     setFormData({ 
-      ...tournament, 
-      cardId: tournament.cardId?._id || tournament.cardId || "",
+      ...tournament,
+      startDate: new Date(tournament.startDate).toISOString().slice(0, 10),
+      endDate: new Date(tournament.endDate).toISOString().slice(0, 10),
       bannerImage: null 
     });
-    setBannerPreview(tournament.bannerImage ? `http://globe.ridealmobility.com/${tournament.bannerImage}` : null);
+    setBannerPreview(tournament.bannerImage ? `http://localhost:5858/${tournament.bannerImage}` : null);
   };
 
-  // Add match
-  const addMatch = async (e) => {
+  const handleMatchChange = (e) => {
+    const { name, value } = e.target;
+    setMatchForm({ ...matchForm, [name]: value });
+  };
+
+  const handleMatchTeamChange = (teamIndex, field, value) => {
+    const updatedTeams = [...matchForm.teams];
+    updatedTeams[teamIndex] = { ...updatedTeams[teamIndex], [field]: value };
+    setMatchForm({ ...matchForm, teams: updatedTeams });
+  };
+
+  const handleMatchTeamFlag = (teamIndex, file) => {
+    const newFlags = [...teamFlags];
+    newFlags[teamIndex] = file;
+    setTeamFlags(newFlags);
+
+    const newPreviews = [...teamFlagPreviews];
+    newPreviews[teamIndex] = URL.createObjectURL(file);
+    setTeamFlagPreviews(newPreviews);
+  };
+
+  const saveMatch = async (e) => {
     e.preventDefault();
+    if (!matchForm.matchNumber || !matchForm.date || !matchForm.time || !matchForm.venue || !matchForm.teams.every(team => team.name)) {
+      setError("Please fill in all required match fields (Match Number, Date, Time, Venue, Team Names).");
+      return;
+    }
     setLoading(true);
     try {
-      if (formMode === "details" && selectedTournament) {
-        // Create new FormData for file upload
-        const formData = new FormData();
-        
-        // Add match details
-        formData.append("matchName", matchForm.matchName);
-        formData.append("date", matchForm.date);
-        formData.append("venue", matchForm.venue);
-        formData.append("stage", matchForm.stage);
-        formData.append("group", matchForm.group);
-        formData.append("status", matchForm.status);
-        
-        // Prepare teams array with legacy fields for backward compatibility
-        const teamsArray = [
-          { name: matchForm.homeTeam || matchForm.teams[0].name, score: matchForm.teams[0].score || 0 },
-          { name: matchForm.awayTeam || matchForm.teams[1].name, score: matchForm.teams[1].score || 0 }
-        ];
-        
-        // Add teams as JSON
-        formData.append("teams", JSON.stringify(teamsArray));
-        
-        // Add team flags if available
-        if (teamFlags[0]) formData.append("teamFlags", teamFlags[0]);
-        if (teamFlags[1]) formData.append("teamFlags", teamFlags[1]);
-        
-        await axios.post(`${API_BASE}/${selectedTournament._id}/matches`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-        
-        fetchTournaments();
-        const updatedTournament = await axios.get(`${API_BASE}/${selectedTournament._id}`);
-        showDetails(updatedTournament.data);
-        setMatchForm(initialMatch);
-        setTeamFlags([null, null]);
-        setTeamFlagPreviews([null, null]);
-      }
-    } catch (err) {
-      setError("Failed to add match");
-      console.error(err);
-    }
-    setLoading(false);
-  };
+      const data = new FormData();
+      data.append("matchNumber", matchForm.matchNumber);
+      data.append("stage", matchForm.stage);
+      data.append("group", matchForm.group);
+      data.append("date", new Date(matchForm.date).toISOString());
+      data.append("time", matchForm.time);
+      data.append("venue", matchForm.venue);
+      data.append("status", matchForm.status);
 
-  // Edit match
-  const editMatch = (match) => {
-    setMatchEditId(match._id);
-    
-    // Initialize teamFlags and previews
-    setTeamFlags([null, null]);
-    setTeamFlagPreviews([null, null]);
-    
-    // Handle teams array or home/away fields
-    let teams = match.teams || [];
-    if (!teams.length && (match.homeTeam || match.awayTeam)) {
-      teams = [
-        { name: match.homeTeam || "", score: 0, flag: null },
-        { name: match.awayTeam || "", score: 0, flag: null }
-      ];
-    }
-    
-    // Set previews for team flags if they exist
-    if (teams[0] && teams[0].flag) {
-      setTeamFlagPreviews([
-        `http://globe.ridealmobility.com/${teams[0].flag}`,
-        teams[1] && teams[1].flag ? `http://globe.ridealmobility.com/${teams[1].flag}` : null
-      ]);
-    }
-    
-    // Set match form
-    setMatchForm({
-      ...match,
-      teams,
-      homeTeam: teams[0]?.name || match.homeTeam || "",
-      awayTeam: teams[1]?.name || match.awayTeam || ""
-    });
-  };
-
-  // Update match
-  const updateMatch = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      // Create new FormData for file upload
-      const formData = new FormData();
-      
-      // Add match details
-      formData.append("matchName", matchForm.matchName);
-      formData.append("date", matchForm.date);
-      formData.append("venue", matchForm.venue);
-      formData.append("stage", matchForm.stage);
-      formData.append("group", matchForm.group);
-      formData.append("status", matchForm.status);
-      
-      // Prepare teams array with legacy fields for backward compatibility
-      const teamsArray = [
-        { name: matchForm.homeTeam || matchForm.teams[0].name, score: matchForm.teams[0].score || 0 },
-        { name: matchForm.awayTeam || matchForm.teams[1].name, score: matchForm.teams[1].score || 0 }
-      ];
-      
-      // Add teams as JSON
-      formData.append("teams", JSON.stringify(teamsArray));
-      
-      // Add team flags if available
-      if (teamFlags[0]) formData.append("teamFlags", teamFlags[0]);
-      if (teamFlags[1]) formData.append("teamFlags", teamFlags[1]);
-      
-      await axios.put(`${API_BASE}/${selectedTournament._id}/matches/${matchEditId}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+      const processedTeams = JSON.parse(JSON.stringify(matchForm.teams));
+      processedTeams.forEach((team) => {
+        delete team.flag;
+        if (team.score === null) delete team.score;
       });
-      
-      fetchTournaments();
+
+      data.append("teams", JSON.stringify(processedTeams));
+
+      teamFlags.forEach((file, index) => {
+        if (file) data.append("teamFlags", file);
+      });
+
+      let res;
+      if (matchEditId && matchEditId !== "new") {
+        res = await axios.put(`${API_BASE}/${selectedTournament._id}/matches/${matchEditId}`, data, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+      } else {
+        res = await axios.post(`${API_BASE}/${selectedTournament._id}/matches`, data, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+      }
+
       const updatedTournament = await axios.get(`${API_BASE}/${selectedTournament._id}`);
       showDetails(updatedTournament.data);
-      setMatchEditId(null);
       setMatchForm(initialMatch);
       setTeamFlags([null, null]);
       setTeamFlagPreviews([null, null]);
+      setMatchEditId(null);
     } catch (err) {
-      setError("Failed to update match");
-      console.error(err);
+      setError("Failed to save match: " + (err.response?.data?.message || err.message));
+      console.error("Save match error:", err.response || err);
     }
     setLoading(false);
   };
 
-  // Delete match
+  const saveLocalMatch = (e) => {
+    e.preventDefault();
+    if (!matchForm.matchNumber || !matchForm.date || !matchForm.time || !matchForm.venue || !matchForm.teams.every(team => team.name)) {
+      setError("Please fill in all required match fields (Match Number, Date, Time, Venue, Team Names).");
+      return;
+    }
+    const newMatch = { ...matchForm };
+    newMatch.teams = newMatch.teams.map((team, index) => ({
+      ...team,
+      flag: teamFlags[index] || team.flag || null,
+      flagPreview: teamFlagPreviews[index] || null,
+    }));
+    let updatedMatches = [...formData.matches];
+    if (matchEditId === "new") {
+      updatedMatches.push(newMatch);
+    } else {
+      updatedMatches[matchEditId] = newMatch;
+    }
+    setFormData({ ...formData, matches: updatedMatches });
+    setMatchForm(initialMatch);
+    setTeamFlags([null, null]);
+    setTeamFlagPreviews([null, null]);
+    setMatchEditId(null);
+  };
+
+  const editMatch = (match, index = null) => {
+    setMatchEditId(index !== null ? index : match._id);
+    setTeamFlags([null, null]);
+    setTeamFlagPreviews([
+      match.teams[0]?.flag ? `http://localhost:5858/${match.teams[0].flag}` : null,
+      match.teams[1]?.flag ? `http://localhost:5858/${match.teams[1].flag}` : null,
+    ]);
+    setMatchForm({
+      ...match,
+      date: new Date(match.date).toISOString().slice(0, 10),
+      time: match.time || "",
+      teams: match.teams.map(team => ({ ...team, score: team.score ?? null })),
+    });
+  };
+
   const deleteMatch = async (matchId) => {
     if (!window.confirm("Delete this match?")) return;
     setLoading(true);
     try {
       await axios.delete(`${API_BASE}/${selectedTournament._id}/matches/${matchId}`);
-      fetchTournaments();
       const updatedTournament = await axios.get(`${API_BASE}/${selectedTournament._id}`);
       showDetails(updatedTournament.data);
     } catch (err) {
-      setError("Failed to delete match");
+      setError("Failed to delete match: " + (err.response?.data?.message || err.message));
+      console.error("Delete match error:", err.response || err);
     }
     setLoading(false);
   };
 
-  // UI
+  const removeLocalMatch = (index) => {
+    if (!window.confirm("Remove this match?")) return;
+    const updatedMatches = [...formData.matches];
+    updatedMatches.splice(index, 1);
+    setFormData({ ...formData, matches: updatedMatches });
+  };
+
+  const renderMatchList = (matches, isLocal = false) => {
+    if (!matches || matches.length === 0) {
+      return <p className="text-gray-500">No matches defined for this tournament.</p>;
+    }
+    return (
+      <div className="space-y-4">
+        {matches.map((match, index) => (
+          <div key={match._id || index} className="bg-gray-50 p-4 rounded-lg border">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-semibold text-gray-800">
+                Match {match.matchNumber}: {match.teams[0]?.name || "TBD"} vs {match.teams[1]?.name || "TBD"}
+              </h4>
+              <div className="space-x-2">
+                <button
+                  className="text-yellow-600 hover:text-yellow-800 text-sm"
+                  onClick={() => editMatch(match, isLocal ? index : null)}
+                >
+                  Edit
+                </button>
+                <button
+                  className="text-red-600 hover:text-red-800 text-sm"
+                  onClick={() => isLocal ? removeLocalMatch(index) : deleteMatch(match._id)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+              <div>
+                <p>Stage: {match.stage || "N/A"}</p>
+                <p>Group: {match.group || "N/A"}</p>
+                <p>Venue: {match.venue}</p>
+              </div>
+              <div>
+                <p>Date: {new Date(match.date).toLocaleDateString()}</p>
+                <p>Time: {match.time}</p>
+                <p>Status: {match.status}</p>
+              </div>
+            </div>
+            <div className="mt-2 flex space-x-4">
+              {match.teams.map((team, i) => (
+                <div key={i} className="flex items-center space-x-2">
+                  {team.flag && (
+                    <img 
+                      src={isLocal && team.flagPreview ? team.flagPreview : `http://localhost:5858/${team.flag}`} 
+                      alt="Team flag" 
+                      className="h-6 w-auto"
+                    />
+                  )}
+                  <span>{team.name} {team.score !== null ? `(${team.score})` : ""}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderMatchForm = (onSubmit) => {
+    if (matchEditId === null) return null;
+    return (
+      <div className="bg-white p-6 rounded-lg border mt-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">
+          {matchEditId === "new" ? "Add Match" : "Edit Match"}
+        </h3>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Match Number</label>
+              <input
+                type="number"
+                name="matchNumber"
+                value={matchForm.matchNumber}
+                onChange={handleMatchChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder="Match number"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Stage</label>
+              <input
+                type="text"
+                name="stage"
+                value={matchForm.stage}
+                onChange={handleMatchChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder="e.g., Group Stage"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Group</label>
+              <input
+                type="text"
+                name="group"
+                value={matchForm.group}
+                onChange={handleMatchChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder="e.g., Group A"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <input
+                type="date"
+                name="date"
+                value={matchForm.date}
+                onChange={handleMatchChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+              <input
+                type="time"
+                name="time"
+                value={matchForm.time}
+                onChange={handleMatchChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Venue</label>
+            <input
+              type="text"
+              name="venue"
+              value={matchForm.venue}
+              onChange={handleMatchChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              placeholder="Enter venue"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              name="status"
+              value={matchForm.status}
+              onChange={handleMatchChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+              <option value="Fixture">Fixture</option>
+              <option value="Live">Live</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          {matchForm.teams.map((team, index) => (
+            <div key={index} className="bg-gray-50 p-4 rounded-lg border">
+              <h4 className="font-medium text-gray-800 mb-2">Team {index + 1}</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={team.name}
+                    onChange={(e) => handleMatchTeamChange(index, "name", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Team name"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                  <input
+                    type="text"
+                    value={team.code}
+                    onChange={(e) => handleMatchTeamChange(index, "code", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Team code (e.g., BRA)"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Score</label>
+                  <input
+                    type="number"
+                    value={team.score ?? ""}
+                    onChange={(e) => handleMatchTeamChange(index, "score", e.target.value ? parseInt(e.target.value) : null)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Score (optional)"
+                  />
+                </div>
+              </div>
+              <div className="mt-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Flag (Optional)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => e.target.files[0] && handleMatchTeamFlag(index, e.target.files[0])}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+                {teamFlagPreviews[index] && (
+                  <img src={teamFlagPreviews[index]} alt="Team flag preview" className="mt-2 h-8 w-auto object-contain" />
+                )}
+              </div>
+            </div>
+          ))}
+          <div className="flex space-x-4 mt-4">
+            <button
+              onClick={onSubmit}
+              disabled={loading}
+              className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
+            >
+              {loading ? "Saving..." : (matchEditId === "new" ? "Add Match" : "Update Match")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMatchForm(initialMatch);
+                setTeamFlags([null, null]);
+                setTeamFlagPreviews([null, null]);
+                setMatchEditId(null);
+              }}
+              className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition duration-200"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between mb-8">
@@ -429,31 +657,12 @@ export default function FootballTournament() {
       {formMode === "list" && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <h2 className="text-2xl font-semibold text-gray-800">Tournaments</h2>
-              
-              {/* Card Filter Dropdown */}
-              <div className="relative">
-                <select 
-                  className="bg-white border border-gray-300 rounded-md py-2 pl-3 pr-10 text-sm leading-5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent cursor-pointer"
-                  onChange={(e) => {
-                    if (e.target.value === "all") {
-                      fetchTournaments();
-                    } else {
-                      fetchTournamentsByCardId(e.target.value);
-                    }
-                  }}
-                >
-                  <option value="all">All Cards</option>
-                  {cardSections.map(card => (
-                    <option key={card._id} value={card._id}>{card.title}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <h2 className="text-2xl font-semibold text-gray-800">Tournaments</h2>
             <button
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition duration-200 flex items-center space-x-2"
-              onClick={() => setFormMode("create")}
+              onClick={() => {
+                setFormMode("create");
+              }}
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -461,7 +670,6 @@ export default function FootballTournament() {
               <span>Create Tournament</span>
             </button>
           </div>
-
           {tournaments.length === 0 ? (
             <div className="text-center py-12">
               <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -477,7 +685,7 @@ export default function FootballTournament() {
                   {tournament.bannerImage && (
                     <div className="h-48 w-full overflow-hidden">
                       <img 
-                        src={`http://globe.ridealmobility.com/${tournament.bannerImage}`} 
+                        src={`http://localhost:5858/${tournament.bannerImage}`} 
                         alt="Tournament Banner" 
                         className="h-full w-full object-cover hover:scale-105 transition duration-300" 
                       />
@@ -533,7 +741,6 @@ export default function FootballTournament() {
           )}
         </div>
       )}
-
       {/* Tournament Form */}
       {(formMode === "create" || formMode === "edit") && (
         <div className="max-w-4xl mx-auto">
@@ -556,14 +763,14 @@ export default function FootballTournament() {
                 </svg>
               </button>
             </div>
-
             {/* Tabs */}
             <div className="border-b border-gray-200 mb-6">
               <nav className="flex space-x-8">
                 {[
                   { id: "basic", label: "Basic Info", icon: "📋" },
                   { id: "stages", label: "Stages", icon: "🏟️" },
-                  { id: "groups", label: "Groups", icon: "👥" }
+                  { id: "groups", label: "Groups", icon: "👥" },
+                  { id: "matches", label: "Matches", icon: "⚽" }
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -579,410 +786,313 @@ export default function FootballTournament() {
                 ))}
               </nav>
             </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Basic Info Tab */}
-              {activeTab === "basic" && (
-                <div className="space-y-6">
+            {/* Basic Info Tab */}
+            {activeTab === "basic" && (
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tournament Name
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Enter tournament name"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tournament Name
+                      Start Date
                     </label>
                     <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
+                      type="date"
+                      name="startDate"
+                      value={formData.startDate}
                       onChange={handleChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="Enter tournament name"
                       required
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Card
+                      End Date
                     </label>
-                    <select
-                      name="cardId"
-                      value={formData.cardId}
+                    <input
+                      type="date"
+                      name="endDate"
+                      value={formData.endDate}
                       onChange={handleChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Host Countries
+                  </label>
+                  <div className="space-y-2">
+                    {formData.hostCountries.map((country, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <input
+                          type="text"
+                          value={country}
+                          onChange={(e) => {
+                            const updated = [...formData.hostCountries];
+                            updated[index] = e.target.value;
+                            setFormData({ ...formData, hostCountries: updated });
+                          }}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          placeholder="Enter country name"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeArrayItem("hostCountries", index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => addArrayItem("hostCountries", "")}
+                      className="text-green-600 hover:text-green-800 text-sm"
                     >
-                      <option value="">Select a card</option>
-                      {cardSections.map((card) => (
-                        <option key={card._id} value={card._id}>
-                          {card.title}
-                        </option>
-                      ))}
-                    </select>
+                      + Add Host Country
+                    </button>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Start Date
-                      </label>
-                      <input
-                        type="date"
-                        name="startDate"
-                        value={formData.startDate}
-                        onChange={handleChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        required
-                      />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Banner Image (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    name="bannerImage"
+                    accept="image/*"
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  {bannerPreview && (
+                    <div className="mt-4">
+                      <img src={bannerPreview} alt="Banner Preview" className="h-32 w-full object-cover rounded-lg" />
+                      {formMode === "edit" && (
+                        <button
+                          type="button"
+                          onClick={clearBannerImage}
+                          className="text-red-500 hover:text-red-700 text-sm mt-2"
+                        >
+                          Clear Banner Image
+                        </button>
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        End Date
-                      </label>
-                      <input
-                        type="date"
-                        name="endDate"
-                        value={formData.endDate}
-                        onChange={handleChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Host Countries
-                    </label>
-                    <div className="space-y-2">
-                      {formData.hostCountries.map((country, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <input
-                            type="text"
-                            value={country}
-                            onChange={(e) => handleArrayChange("hostCountries", index, e.target.value)}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            placeholder="Enter country name"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeArrayItem("hostCountries", index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Stages Tab */}
+            {activeTab === "stages" && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium text-gray-900">Tournament Stages</h3>
+                  <button
+                    type="button"
+                    onClick={() => addArrayItem("stages", "")}
+                    className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-sm hover:bg-green-200"
+                  >
+                    + Add Stage
+                  </button>
+                </div>
+                {formData.stages.map((stage, index) => (
+                  <div key={index} className="bg-gray-50 p-4 rounded-lg border">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="font-medium text-gray-800">Stage {index + 1}</h4>
                       <button
                         type="button"
-                        onClick={() => addArrayItem("hostCountries", "")}
-                        className="text-green-600 hover:text-green-800 text-sm"
+                        onClick={() => removeArrayItem("stages", index)}
+                        className="text-red-500 hover:text-red-700 text-sm"
                       >
-                        + Add Host Country
+                        Remove
                       </button>
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Banner Image
-                    </label>
-                    <input
-                      type="file"
-                      name="bannerImage"
-                      accept="image/*"
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                    {bannerPreview && (
-                      <div className="mt-4">
-                        <img src={bannerPreview} alt="Banner Preview" className="h-32 w-full object-cover rounded-lg" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Stages Tab */}
-              {activeTab === "stages" && (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium text-gray-900">Tournament Stages</h3>
-                    <button
-                      type="button"
-                      onClick={addStage}
-                      className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-sm hover:bg-green-200"
-                    >
-                      + Add Stage
-                    </button>
-                  </div>
-                  
-                  {formData.stages.map((stage, index) => (
-                    <div key={index} className="bg-gray-50 p-4 rounded-lg border">
-                      <div className="flex justify-between items-center mb-4">
-                        <h4 className="font-medium text-gray-800">Stage {index + 1}</h4>
-                        <button
-                          type="button"
-                          onClick={() => removeArrayItem("stages", index)}
-                          className="text-red-500 hover:text-red-700 text-sm"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Stage Name</label>
-                          <input
-                            type="text"
-                            value={stage.name || ""}
-                            onChange={(e) => {
-                              const updatedStages = [...formData.stages];
-                              updatedStages[index] = { ...updatedStages[index], name: e.target.value };
-                              setFormData({ ...formData, stages: updatedStages });
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            placeholder="e.g., Group Stage, Quarter-finals"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                          <input
-                            type="text"
-                            value={stage.description || ""}
-                            onChange={(e) => {
-                              const updatedStages = [...formData.stages];
-                              updatedStages[index] = { ...updatedStages[index], description: e.target.value };
-                              setFormData({ ...formData, stages: updatedStages });
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            placeholder="Stage description"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                          <input
-                            type="date"
-                            value={stage.startDate || ""}
-                            onChange={(e) => {
-                              const updatedStages = [...formData.stages];
-                              updatedStages[index] = { ...updatedStages[index], startDate: e.target.value };
-                              setFormData({ ...formData, stages: updatedStages });
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                          <input
-                            type="date"
-                            value={stage.endDate || ""}
-                            onChange={(e) => {
-                              const updatedStages = [...formData.stages];
-                              updatedStages[index] = { ...updatedStages[index], endDate: e.target.value };
-                              setFormData({ ...formData, stages: updatedStages });
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Stage Name</label>
+                      <input
+                        type="text"
+                        value={stage}
+                        onChange={(e) => {
+                          const updatedStages = [...formData.stages];
+                          updatedStages[index] = e.target.value;
+                          setFormData({ ...formData, stages: updatedStages });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="e.g., Group Stage"
+                      />
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Groups Tab */}
-              {activeTab === "groups" && (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium text-gray-900">Tournament Groups</h3>
-                    <button
-                      type="button"
-                      onClick={addGroup}
-                      className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-sm hover:bg-green-200"
-                    >
-                      + Add Group
-                    </button>
                   </div>
-                  
-                  {formData.groups.map((group, groupIndex) => (
-                    <div key={groupIndex} className="bg-gray-50 p-4 rounded-lg border">
-                      <div className="flex justify-between items-center mb-4">
-                        <h4 className="font-medium text-gray-800">Group {groupIndex + 1}</h4>
-                        <button
-                          type="button"
-                          onClick={() => removeArrayItem("groups", groupIndex)}
-                          className="text-red-500 hover:text-red-700 text-sm"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Group Name</label>
-                          <input
-                            type="text"
-                            value={group.name || ""}
-                            onChange={(e) => {
-                              const updatedGroups = [...formData.groups];
-                              updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], name: e.target.value };
-                              setFormData({ ...formData, groups: updatedGroups });
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            placeholder="e.g., Group A, Group B"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Teams</label>
-                          <div className="space-y-4">
-                            {(group.teams || []).map((team, teamIndex) => (
-                              <div key={teamIndex} className="bg-white p-3 rounded-lg border border-gray-200">
-                                <div className="flex items-start space-x-2">
-                                  <div className="flex-1 space-y-3">
-                                    <div>
-                                      <label className="block text-sm font-medium text-gray-700 mb-1">Team Name</label>
-                                      <input
-                                        type="text"
-                                        value={typeof team === 'object' ? team.name || '' : team}
-                                        onChange={(e) => {
-                                          const updatedGroups = [...formData.groups];
-                                          const updatedTeams = [...(updatedGroups[groupIndex].teams || [])];
-                                          
-                                          // Handle if team is string or object
-                                          if (typeof team === 'object') {
-                                            updatedTeams[teamIndex] = { ...updatedTeams[teamIndex], name: e.target.value };
-                                          } else {
-                                            // Convert from string to object
-                                            updatedTeams[teamIndex] = { name: e.target.value, flag: null };
-                                          }
-                                          
-                                          updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], teams: updatedTeams };
-                                          setFormData({ ...formData, groups: updatedGroups });
-                                        }}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                        placeholder="Enter team name"
-                                      />
-                                    </div>
-                                    
-                                    <div>
-                                      <label className="block text-sm font-medium text-gray-700 mb-1">Team Flag</label>
-                                      <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                          if (e.target.files && e.target.files[0]) {
-                                            const updatedGroups = [...formData.groups];
-                                            const updatedTeams = [...(updatedGroups[groupIndex].teams || [])];
-                                            
-                                            // Ensure team is an object
-                                            if (typeof updatedTeams[teamIndex] !== 'object') {
-                                              updatedTeams[teamIndex] = { name: updatedTeams[teamIndex], flag: null };
-                                            }
-                                            
-                                            // Store file in form data
-                                            updatedTeams[teamIndex] = { 
-                                              ...updatedTeams[teamIndex], 
-                                              flag: e.target.files[0],
-                                              flagPreview: URL.createObjectURL(e.target.files[0])
-                                            };
-                                            
-                                            updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], teams: updatedTeams };
-                                            setFormData({ ...formData, groups: updatedGroups });
-                                          }
-                                        }}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                      />
-                                      
-                                      {/* Preview flag if available */}
-                                      {typeof team === 'object' && team.flagPreview && (
-                                        <div className="mt-2">
-                                          <img 
-                                            src={team.flagPreview} 
-                                            alt={`${team.name || 'Team'} Flag`} 
-                                            className="h-8 w-auto object-contain" 
-                                          />
-                                        </div>
-                                      )}
-                                      
-                                      {/* Show existing flag if available */}
-                                      {typeof team === 'object' && team.flag && !team.flagPreview && (
-                                        <div className="mt-2">
-                                          <img 
-                                            src={`http://globe.ridealmobility.com/${team.flag}`} 
-                                            alt={`${team.name || 'Team'} Flag`} 
-                                            className="h-8 w-auto object-contain" 
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const updatedGroups = [...formData.groups];
-                                      const updatedTeams = [...(updatedGroups[groupIndex].teams || [])];
-                                      updatedTeams.splice(teamIndex, 1);
-                                      updatedGroups[groupIndex] = { ...updatedGroups[groupIndex], teams: updatedTeams };
-                                      setFormData({ ...formData, groups: updatedGroups });
-                                    }}
-                                    className="text-red-500 hover:text-red-700"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updatedGroups = [...formData.groups];
-                                const currentTeams = updatedGroups[groupIndex].teams || [];
-                                updatedGroups[groupIndex] = { 
-                                  ...updatedGroups[groupIndex], 
-                                  teams: [...currentTeams, { name: "", flag: null }] 
-                                };
-                                setFormData({ ...formData, groups: updatedGroups });
-                              }}
-                              className="text-green-600 hover:text-green-800 text-sm"
-                            >
-                              + Add Team
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex space-x-4 pt-6 border-t">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
-                >
-                  {loading ? "Saving..." : (formMode === "create" ? "Create Tournament" : "Update Tournament")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormMode("list");
-                    setFormData(initialTournament);
-                    setBannerPreview(null);
-                    setError("");
-                  }}
-                  className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition duration-200"
-                >
-                  Cancel
-                </button>
+                ))}
               </div>
-            </form>
+            )}
+            {/* Groups Tab */}
+            {activeTab === "groups" && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium text-gray-900">Tournament Groups</h3>
+                  <button
+                    type="button"
+                    onClick={addGroup}
+                    className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-sm hover:bg-green-200"
+                  >
+                    + Add Group
+                  </button>
+                </div>
+                {formData.groups.map((group, groupIndex) => (
+                  <div key={groupIndex} className="bg-gray-50 p-4 rounded-lg border">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="font-medium text-gray-800">Group {groupIndex + 1}</h4>
+                      <button
+                        type="button"
+                        onClick={() => removeArrayItem("groups", groupIndex)}
+                        className="text-red-500 hover:text-red-700 text-sm"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Group Name</label>
+                        <input
+                          type="text"
+                          value={group.name || ""}
+                          onChange={(e) => handleGroupChange(groupIndex, "name", e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          placeholder="e.g., Group A"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="block text-sm font-medium text-gray-700">Teams</label>
+                          <button
+                            type="button"
+                            onClick={() => addTeamToGroup(groupIndex)}
+                            className="text-green-600 hover:text-green-800 text-sm"
+                          >
+                            + Add Team
+                          </button>
+                        </div>
+                        {group.teams.map((team, teamIndex) => (
+                          <div key={teamIndex} className="bg-white p-3 rounded-lg border mb-2">
+                            <div className="flex justify-between items-center mb-2">
+                              <h5 className="text-sm font-medium text-gray-700">Team {teamIndex + 1}</h5>
+                              <button
+                                type="button"
+                                onClick={() => removeTeamFromGroup(groupIndex, teamIndex)}
+                                className="text-red-500 hover:text-red-700 text-sm"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                                <input
+                                  type="text"
+                                  value={team.name}
+                                  onChange={(e) => handleTeamChange(groupIndex, teamIndex, "name", e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                  placeholder="Team name"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                                <input
+                                  type="text"
+                                  value={team.code}
+                                  onChange={(e) => handleTeamChange(groupIndex, teamIndex, "code", e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                  placeholder="Team code (e.g., BRA)"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Flag</label>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => e.target.files[0] && handleGroupTeamFlag(groupIndex, teamIndex, e.target.files[0])}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                />
+                                {(team.flagPreview || team.flag) && (
+                                  <img 
+                                    src={team.flagPreview || `http://localhost:5858/${team.flag}`} 
+                                    alt="Team flag" 
+                                    className="mt-2 h-8 w-auto object-contain" 
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Matches Tab in Create/Edit */}
+            {activeTab === "matches" && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium text-gray-900">Tournament Matches</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMatchEditId("new");
+                      setMatchForm(initialMatch);
+                      setTeamFlags([null, null]);
+                      setTeamFlagPreviews([null, null]);
+                    }}
+                    className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-sm hover:bg-green-200"
+                  >
+                    + Add Match
+                  </button>
+                </div>
+                {renderMatchList(formData.matches, true)}
+                {matchEditId !== null && renderMatchForm(saveLocalMatch)}
+              </div>
+            )}
+            <div className="flex space-x-4 pt-6 border-t">
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
+              >
+                {loading ? "Saving..." : (formMode === "create" ? "Create Tournament" : "Update Tournament")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFormMode("list");
+                  setFormData(initialTournament);
+                  setBannerPreview(null);
+                  setError("");
+                }}
+                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition duration-200"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
-
       {/* Tournament Details & Match Management */}
       {formMode === "details" && selectedTournament && (
         <div className="max-w-6xl mx-auto">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            {/* Tournament Header */}
             <div className="relative">
               {bannerPreview && (
                 <div className="h-64 w-full overflow-hidden">
@@ -1026,8 +1136,6 @@ export default function FootballTournament() {
                 </div>
               </div>
             </div>
-
-            {/* Tournament Details Tabs */}
             <div className="border-t border-gray-200">
               <div className="flex">
                 {[
@@ -1048,23 +1156,15 @@ export default function FootballTournament() {
                   </button>
                 ))}
               </div>
-
               <div className="p-8">
-                {/* Stages Tab */}
                 {activeTab === "stages" && (
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-6">Tournament Stages</h3>
-                    {selectedTournament.stages && selectedTournament.stages.length > 0 ? (
+                    {formData.stages.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {selectedTournament.stages.map((stage, index) => (
+                        {formData.stages.map((stage, index) => (
                           <div key={index} className="bg-gray-50 rounded-lg p-4 border">
-                            <h4 className="font-semibold text-gray-800 mb-2">🏟️ {stage.name}</h4>
-                            {stage.description && <p className="text-gray-600 mb-2">{stage.description}</p>}
-                            {stage.startDate && stage.endDate && (
-                              <p className="text-sm text-gray-500">
-                                📅 {new Date(stage.startDate).toLocaleDateString()} - {new Date(stage.endDate).toLocaleDateString()}
-                              </p>
-                            )}
+                            <h4 className="font-semibold text-gray-800 mb-2">🏟️ {stage}</h4>
                           </div>
                         ))}
                       </div>
@@ -1073,34 +1173,26 @@ export default function FootballTournament() {
                     )}
                   </div>
                 )}
-
-                {/* Groups Tab */}
                 {activeTab === "groups" && (
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-6">Tournament Groups</h3>
-                    {selectedTournament.groups && selectedTournament.groups.length > 0 ? (
+                    {formData.groups.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {selectedTournament.groups.map((group, index) => (
+                        {formData.groups.map((group, index) => (
                           <div key={index} className="bg-gray-50 rounded-lg p-4 border">
                             <h4 className="font-semibold text-gray-800 mb-3">👥 {group.name}</h4>
-                            {group.teams && group.teams.length > 0 ? (
+                            {group.teams.length > 0 ? (
                               <div className="space-y-1">
                                 {group.teams.map((team, teamIndex) => (
-                                  <div key={teamIndex} className="bg-white px-3 py-1 rounded text-sm flex items-center">
-                                    {typeof team === 'object' ? (
-                                      <>
-                                        {team.flag && (
-                                          <img 
-                                            src={`http://globe.ridealmobility.com/${team.flag}`} 
-                                            alt="Team Flag" 
-                                            className="h-6 w-auto object-contain mr-2" 
-                                          />
-                                        )}
-                                        <span>⚽ {team.name}</span>
-                                      </>
-                                    ) : (
-                                      <span>⚽ {team}</span>
+                                  <div key={teamIndex} className="bg-white px-3 py-1 rounded text-sm flex items-center space-x-2">
+                                    {team.flag && (
+                                      <img 
+                                        src={`http://localhost:5858/${team.flag}`} 
+                                        alt="Team Flag" 
+                                        className="h-5 w-auto"
+                                      />
                                     )}
+                                    <span>{team.name} ({team.code})</span>
                                   </div>
                                 ))}
                               </div>
@@ -1115,332 +1207,26 @@ export default function FootballTournament() {
                     )}
                   </div>
                 )}
-
-                {/* Matches Tab */}
                 {activeTab === "matches" && (
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-6">Matches</h3>
-                    
-                    {/* Matches List */}
-                    {selectedTournament.matches && selectedTournament.matches.length > 0 ? (
-                      <div className="space-y-4 mb-8">
-                        {selectedTournament.matches.map(match => (
-                          <div key={match._id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                            <div className="p-6">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <h4 className="text-lg font-medium text-gray-900 mb-2">⚽ {match.matchName || "Football Match"}</h4>
-                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                                    {match.date && (
-                                      <div className="flex items-center">
-                                        <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        {new Date(match.date).toLocaleDateString()}
-                                      </div>
-                                    )}
-                                    {match.venue && (
-                                      <div className="flex items-center">
-                                        <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        </svg>
-                                        {match.venue}
-                                      </div>
-                                    )}
-                                    {match.stage && (
-                                      <div className="flex items-center">
-                                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                                          {match.stage}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                  
-                                  {/* Teams Display */}
-                                  <div className="mt-3 flex items-center justify-center space-x-4">
-                                    {/* Team 1 */}
-                                    {(match.teams && match.teams.length > 0) ? (
-                                      <div className="flex items-center space-x-2">
-                                        {match.teams[0].flag && (
-                                          <img 
-                                            src={`http://globe.ridealmobility.com/${match.teams[0].flag}`} 
-                                            alt="Team 1 Flag" 
-                                            className="h-8 w-auto object-contain"
-                                          />
-                                        )}
-                                        <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded font-medium">
-                                          {match.teams[0].name || match.homeTeam}
-                                          {match.teams[0].score !== undefined && ` (${match.teams[0].score})`}
-                                        </div>
-                                      </div>
-                                    ) : match.homeTeam && (
-                                      <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded font-medium">
-                                        {match.homeTeam}
-                                      </div>
-                                    )}
-                                    
-                                    <span className="text-lg font-bold text-gray-400">VS</span>
-                                    
-                                    {/* Team 2 */}
-                                    {(match.teams && match.teams.length > 1) ? (
-                                      <div className="flex items-center space-x-2">
-                                        <div className="bg-red-100 text-red-800 px-3 py-1 rounded font-medium">
-                                          {match.teams[1].name || match.awayTeam}
-                                          {match.teams[1].score !== undefined && ` (${match.teams[1].score})`}
-                                        </div>
-                                        {match.teams[1].flag && (
-                                          <img 
-                                            src={`http://globe.ridealmobility.com/${match.teams[1].flag}`} 
-                                            alt="Team 2 Flag" 
-                                            className="h-8 w-auto object-contain"
-                                          />
-                                        )}
-                                      </div>
-                                    ) : match.awayTeam && (
-                                      <div className="bg-red-100 text-red-800 px-3 py-1 rounded font-medium">
-                                        {match.awayTeam}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex space-x-2 ml-4">
-                                  <button
-                                    onClick={() => editMatch(match)}
-                                    className="bg-yellow-50 text-yellow-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-yellow-100 transition duration-200"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => deleteMatch(match._id)}
-                                    className="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-100 transition duration-200"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 mb-8">
-                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        <h3 className="mt-2 text-sm font-medium text-gray-900">No matches scheduled</h3>
-                        <p className="mt-1 text-sm text-gray-500">Add the first match to get started.</p>
-                      </div>
-                    )}
-
-                    {/* Add/Edit Match Form */}
-                    <div className="bg-gray-50 rounded-lg p-6">
-                      <h4 className="text-lg font-medium text-gray-900 mb-4">
-                        {matchEditId ? "Edit Match" : "Add New Match"}
-                      </h4>
-                      <form onSubmit={matchEditId ? updateMatch : addMatch} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Match Name</label>
-                            <input
-                              type="text"
-                              value={matchForm.matchName}
-                              onChange={(e) => setMatchForm({ ...matchForm, matchName: e.target.value })}
-                              placeholder="e.g., Semi-Final 1"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                            <input
-                              type="datetime-local"
-                              value={matchForm.date}
-                              onChange={(e) => setMatchForm({ ...matchForm, date: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                              required
-                            />
-                          </div>
-                          
-                          {/* Team 1 */}
-                          <div className="md:col-span-2 bg-white p-4 rounded-lg border border-gray-200 mb-2">
-                            <h5 className="font-medium text-gray-800 mb-3">Team 1 (Home)</h5>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Team Name</label>
-                                <input
-                                  type="text"
-                                  value={matchForm.homeTeam || (matchForm.teams[0] ? matchForm.teams[0].name : "")}
-                                  onChange={(e) => {
-                                    const teams = [...matchForm.teams];
-                                    teams[0] = { ...teams[0], name: e.target.value };
-                                    setMatchForm({ 
-                                      ...matchForm, 
-                                      homeTeam: e.target.value,
-                                      teams: teams
-                                    });
-                                  }}
-                                  placeholder="e.g., Brazil"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                  required
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Team Flag</label>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                      const newFlags = [...teamFlags];
-                                      newFlags[0] = e.target.files[0];
-                                      setTeamFlags(newFlags);
-                                      
-                                      const newPreviews = [...teamFlagPreviews];
-                                      newPreviews[0] = URL.createObjectURL(e.target.files[0]);
-                                      setTeamFlagPreviews(newPreviews);
-                                    }
-                                  }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                                {teamFlagPreviews[0] && (
-                                  <div className="mt-2">
-                                    <img 
-                                      src={teamFlagPreviews[0]} 
-                                      alt="Team 1 Flag" 
-                                      className="h-12 w-auto object-contain border rounded"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Team 2 */}
-                          <div className="md:col-span-2 bg-white p-4 rounded-lg border border-gray-200 mb-2">
-                            <h5 className="font-medium text-gray-800 mb-3">Team 2 (Away)</h5>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Team Name</label>
-                                <input
-                                  type="text"
-                                  value={matchForm.awayTeam || (matchForm.teams[1] ? matchForm.teams[1].name : "")}
-                                  onChange={(e) => {
-                                    const teams = [...matchForm.teams];
-                                    teams[1] = { ...teams[1], name: e.target.value };
-                                    setMatchForm({ 
-                                      ...matchForm, 
-                                      awayTeam: e.target.value,
-                                      teams: teams
-                                    });
-                                  }}
-                                  placeholder="e.g., Argentina"
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                  required
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Team Flag</label>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                      const newFlags = [...teamFlags];
-                                      newFlags[1] = e.target.files[0];
-                                      setTeamFlags(newFlags);
-                                      
-                                      const newPreviews = [...teamFlagPreviews];
-                                      newPreviews[1] = URL.createObjectURL(e.target.files[0]);
-                                      setTeamFlagPreviews(newPreviews);
-                                    }
-                                  }}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                                {teamFlagPreviews[1] && (
-                                  <div className="mt-2">
-                                    <img 
-                                      src={teamFlagPreviews[1]} 
-                                      alt="Team 2 Flag" 
-                                      className="h-12 w-auto object-contain border rounded"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Venue</label>
-                            <input
-                              type="text"
-                              value={matchForm.venue}
-                              onChange={(e) => setMatchForm({ ...matchForm, venue: e.target.value })}
-                              placeholder="e.g., Wembley Stadium"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Stage</label>
-                            <input
-                              type="text"
-                              value={matchForm.stage}
-                              onChange={(e) => setMatchForm({ ...matchForm, stage: e.target.value })}
-                              placeholder="e.g., Group Stage, Final"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Group</label>
-                            <input
-                              type="text"
-                              value={matchForm.group}
-                              onChange={(e) => setMatchForm({ ...matchForm, group: e.target.value })}
-                              placeholder="e.g., Group A"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                            <select
-                              value={matchForm.status}
-                              onChange={(e) => setMatchForm({ ...matchForm, status: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            >
-                              <option value="Scheduled">Scheduled</option>
-                              <option value="Live">Live</option>
-                              <option value="Finished">Finished</option>
-                              <option value="Cancelled">Cancelled</option>
-                              <option value="Postponed">Postponed</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="flex space-x-3">
-                          <button
-                            type="submit"
-                            disabled={loading}
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 transition duration-200"
-                          >
-                            {loading ? "Saving..." : (matchEditId ? "Update Match" : "Add Match")}
-                          </button>
-                          {matchEditId && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setMatchEditId(null);
-                                setMatchForm(initialMatch);
-                                setTeamFlags([null, null]);
-                                setTeamFlagPreviews([null, null]);
-                              }}
-                              className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition duration-200"
-                            >
-                              Cancel
-                            </button>
-                          )}
-                        </div>
-                      </form>
+                    <div className="flex justify-between items-center mb-4">
+                      <span />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMatchEditId("new");
+                          setMatchForm(initialMatch);
+                          setTeamFlags([null, null]);
+                          setTeamFlagPreviews([null, null]);
+                        }}
+                        className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-sm hover:bg-green-200"
+                      >
+                        + Add Match
+                      </button>
                     </div>
+                    {renderMatchList(formData.matches)}
+                    {matchEditId !== null && renderMatchForm(saveMatch)}
                   </div>
                 )}
               </div>
